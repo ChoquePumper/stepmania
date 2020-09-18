@@ -43,7 +43,7 @@ static void TimeMeterSecondsChangeInit( size_t /*ScoreEvent*/ i, RString &sNameO
 	defaultValueOut = g_fTimeMeterSecondsChangeInit[i];
 }
 
-static Preference1D<float>	g_fTimeMeterSecondsChange( TimeMeterSecondsChangeInit, NUM_ScoreEvent );
+/*non-static*/ Preference1D<float>	g_fTimeMeterSecondsChange( TimeMeterSecondsChangeInit, NUM_ScoreEvent );
 
 
 LifeMeterTime::LifeMeterTime()

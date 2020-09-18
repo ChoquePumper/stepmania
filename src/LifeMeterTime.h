@@ -33,9 +33,10 @@ public:
 	virtual bool IsFailing() const;
 	virtual float GetLife() const;
 
-private:
+protected: // I want to make the following methods be accesible for derived class.
 	float GetLifeSeconds() const;
 	void SendLifeChangedMessage( float fOldLife, TapNoteScore tns, HoldNoteScore hns );
+private:
 
 	AutoActor		m_sprBackground;
 	Quad			m_quadDangerGlow;
