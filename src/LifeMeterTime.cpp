@@ -132,7 +132,7 @@ void LifeMeterTime::OnLoadSong()
 	SendLifeChangedMessage( fOldLife, TapNoteScore_Invalid, HoldNoteScore_Invalid );
 }
 
-void LifeMeterTime::ChangeLife( TapNoteScore tns )
+void LifeMeterTime::ChangeLife( TapNoteScore tns, int nCol )
 {
 	if( GetLifeSeconds() <= 0 )
 		return;

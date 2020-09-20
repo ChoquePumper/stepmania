@@ -16,6 +16,7 @@ static const char *LifeTypeNames[] = {
 	"Bar",
 	"Battery",
 	"Time",
+	"Time2",
 };
 XToString( LifeType );
 XToLocalizedString( LifeType );
@@ -166,6 +167,9 @@ void PlayerOptions::GetMods( vector<RString> &AddTo, bool bForceNoteSkin ) const
 			break;
 		case LifeType_Time:
 			AddTo.push_back("LifeTime");
+			break;
+		case LifeType_Time2:
+			AddTo.push_back("LifeTime2");
 			break;
 		default:
 			FAIL_M(ssprintf("Invalid LifeType: %i", m_LifeType));
@@ -453,6 +457,7 @@ bool PlayerOptions::FromOneModString( const RString &sOneMod, RString &sErrorOut
 	else if( sBit == "bar" ) { m_LifeType= LifeType_Bar; }
 	else if( sBit == "battery" ) { m_LifeType= LifeType_Battery; }
 	else if( sBit == "lifetime" ) { m_LifeType= LifeType_Time; }
+	else if( sBit == "lifetime2" ) { m_LifeType= LifeType_Time2; }
 	else if( sBit == "norecover" || sBit == "power-drop" ) { m_DrainType= DrainType_NoRecover; }
 	else if( sBit == "suddendeath" || sBit == "death" ) { m_DrainType= DrainType_SuddenDeath; }
 	else if( sBit == "normal-drain" ) { m_DrainType= DrainType_Normal; }

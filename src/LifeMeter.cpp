@@ -3,6 +3,8 @@
 #include "LifeMeterBar.h"
 #include "LifeMeterBattery.h"
 #include "LifeMeterTime.h"
+#include "LifeMeterTime2.h"
+#include "RageLog.h"
 
 LifeMeter *LifeMeter::MakeLifeMeter( LifeType t )
 {
@@ -11,9 +13,11 @@ LifeMeter *LifeMeter::MakeLifeMeter( LifeType t )
 	case LifeType_Bar:     return new LifeMeterBar;
 	case LifeType_Battery: return new LifeMeterBattery;
 	case LifeType_Time:    return new LifeMeterTime;
+	case LifeType_Time2:    return new LifeMeterTime2;	// :)
 	default:
 		FAIL_M(ssprintf("Unrecognized LifeMeter type: %i", t));
 	}
+	LOG->Trace("LifeMeter::MakeLifeMeter: t=%d\n", (int)t);
 }
 
 // lua start

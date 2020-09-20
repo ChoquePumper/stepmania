@@ -27,7 +27,7 @@ public:
 	 *
 	 * This *is* called for the head of hold notes. 
 	 * @param score the tap note grade in question. */
-	virtual void ChangeLife( TapNoteScore score ) = 0;
+	virtual void ChangeLife( TapNoteScore score, int nCol=1 ) = 0;
 	/**
 	 * @brief Change life after receiving a hold note grade.
 	 *

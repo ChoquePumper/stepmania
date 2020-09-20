@@ -20,7 +20,7 @@ public:
 	virtual void Update( float fDeltaTime );
 
 	virtual void OnSongEnded();
-	virtual void ChangeLife( TapNoteScore score );
+	virtual void ChangeLife( TapNoteScore score, int nCol=1 );
 	virtual void ChangeLife( HoldNoteScore score, TapNoteScore tscore );
 	virtual void ChangeLife( float fDeltaLifePercent );
 	virtual void SetLife(float value);

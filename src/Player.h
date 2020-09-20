@@ -159,7 +159,7 @@ protected:
 	void IncrementCombo() { IncrementComboOrMissCombo(true); };
 	void IncrementMissCombo() { IncrementComboOrMissCombo(false); };
 
-	void ChangeLife( TapNoteScore tns );
+	void ChangeLife( TapNoteScore tns, int nCol=1 );
 	void ChangeLife( HoldNoteScore hns, TapNoteScore tns );
 	void ChangeLifeRecord();
 

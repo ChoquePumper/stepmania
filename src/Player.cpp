@@ -1661,7 +1661,7 @@ void Player::DrawHoldJudgments()
 }
 
 
-void Player::ChangeLife( TapNoteScore tns )
+void Player::ChangeLife( TapNoteScore tns, int nCol )
 {
 	PlayerNumber pn = m_pPlayerState->m_PlayerNumber;
 	if( m_pLifeMeter )
@@ -2869,6 +2869,8 @@ void Player::HandleTapRowScore( unsigned row )
 	TapNoteScore scoreOfLastTap = NoteDataWithScoring::LastTapNoteWithResult(m_NoteData, row).result.tns;
 	const unsigned int iOldCombo = m_pPlayerStageStats ? m_pPlayerStageStats->m_iCurCombo : 0;
 	const unsigned int iOldMissCombo = m_pPlayerStageStats ? m_pPlayerStageStats->m_iCurMissCombo : 0;
+	
+	int nCol = 0; // :)
 
 	if( scoreOfLastTap == TNS_Miss )
 		m_LastTapNoteScore = TNS_Miss;
@@ -2886,6 +2888,9 @@ void Player::HandleTapRowScore( unsigned row )
 			m_pPrimaryScoreKeeper->HandleTapScore( tn );
 		if( m_pSecondaryScoreKeeper )
 			m_pSecondaryScoreKeeper->HandleTapScore( tn );
+			
+		if( tn.type == TapNoteType_Tap || tn.type == TapNoteType_HoldHead || tn.type == TapNoteType_Lift )
+			nCol++;
 	}
 
 	if( m_pPrimaryScoreKeeper != NULL )
@@ -2953,7 +2958,7 @@ void Player::HandleTapRowScore( unsigned row )
 		m_pSecondaryScoreDisplay->OnJudgment( scoreOfLastTap );
 	}
 
-	ChangeLife( scoreOfLastTap );
+	ChangeLife( scoreOfLastTap, nCol );
 }
 
 void Player::HandleHoldCheckpoint(int iRow, 

@@ -1,5 +1,5 @@
 #include "global.h"
-#include "LifeMeterTime.h"
+#include "LifeMeterTime2.h"
 #include "ThemeManager.h"
 #include "Song.h"
 #include "Steps.h"
@@ -22,10 +22,10 @@ static ThemeMetric<LuaReference> FILL_NO_TIMES_FUNC	("LifeMeterTime2","FillNoTim
 static ThemeMetric<float> ALLOW_LOWER_GAIN_PER_TAP	("LifeMeterTime2","AllowLowerGainPerTap");
 						// 0.0f = false,	1.0f = true
 // From LifeMeterTime
-static ThemeMetric<float> METER_WIDTH;		("LifeMeterTime","MeterWidth");
-static ThemeMetric<float> METER_HEIGHT;		("LifeMeterTime","MeterHeight");
-static ThemeMetric<float> DANGER_THRESHOLD;	("LifeMeterTime","DangerThreshold");
-static ThemeMetric<float> INITIAL_VALUE;		("LifeMeterTime","InitialValue");
+static ThemeMetric<float> METER_WIDTH		("LifeMeterTime","MeterWidth");
+static ThemeMetric<float> METER_HEIGHT		("LifeMeterTime","MeterHeight");
+static ThemeMetric<float> DANGER_THRESHOLD	("LifeMeterTime","DangerThreshold");
+static ThemeMetric<float> INITIAL_VALUE		("LifeMeterTime","InitialValue");
 
 
 // This implementation makes LifeMeterTime to behave (a bit) similiar to osu! HP bar.
@@ -60,7 +60,7 @@ static const float g_fColsNegFactor[] =
 LifeMeterTime2::LifeMeterTime2()
 	: LifeMeterTime()
 {
-	m_maxSeconds = MAX_TIME;
+	m_fMaxSeconds = MAX_TIME;
 	for(int i=0; i<12; i++) m_customlifechange[i] = g_fTimeMeterSecondsChange[i];
 	//m_fLifeTotalGainedSeconds = 0;	// Private
 	//m_fLifeTotalLostSeconds = 0;	// Private
@@ -74,8 +74,16 @@ LifeMeterTime2::LifeMeterTime2()
 
 void LifeMeterTime2::Load( const PlayerState *pPlayerState, PlayerStageStats *pPlayerStageStats )
 {
-	//SetCustomLifeChange();
 	LifeMeterTime::Load( pPlayerState, pPlayerStageStats );
+}
+
+void LifeMeterTime2::Update( float fDeltaTime )
+{
+	if (!m_bLockLife) {
+		m_fCurrentCummulativeStop = getCummulativeStopSecs( (float)GAMESTATE->m_Position.m_fMusicSeconds ) - m_firstSecondCummulativeStop;
+		
+	}
+	LifeMeterTime::Update( fDeltaTime );
 }
 
 void LifeMeterTime2::OnLoadSong()
@@ -122,12 +130,12 @@ void LifeMeterTime2::OnLoadSong()
 	
 		fMaxGainPerTap = song_len/scorable_things;
 		// fGainPerTap = fGainPerTap*(1.232f+(float)scorable_things/8000.0f)+(0.008f*min(song_len,240)/60);
-		fMaxGainPerTap = fGainPerTap*(CONSTANT_BONUS+(float)scorable_things/8000.0f)+(0.007f*min(song_len,240)/60);
+		fMaxGainPerTap = fMaxGainPerTap*(CONSTANT_BONUS+(float)scorable_things/8000.0f)+(0.007f*min(song_len,240)/60);
 		
 	}
-	m_customlifechange[SE_W1] = fGainPerTap;
-	m_customlifechange[SE_W2] = fGainPerTap*0.5f;
-	m_customlifechange[SE_W3] = fGainPerTap*0.02f;
+	m_customlifechange[SE_W1] = fMaxGainPerTap;
+	m_customlifechange[SE_W2] = fMaxGainPerTap*0.5f;
+	m_customlifechange[SE_W3] = fMaxGainPerTap*0.02f;
 	
 	for(int i=0; i<12; i++) {
 		float fGainPerTap = m_customlifechange[i];
@@ -145,12 +153,19 @@ void LifeMeterTime2::OnLoadSong()
 	m_fLifeTotalGainedSeconds += fGainSeconds;
 	m_soundGainLife.Play(false);
 	SendLifeChangedMessage( fOldLife, TapNoteScore_Invalid, HoldNoteScore_Invalid );
+	m_bLockLife = false;
+	
 }
 
+void LifeMeterTime2::OnSongEnded()
+{
+	m_bLockLife = true;
+}
 
-void LifeMeterTime2::ChangeLife( TapNoteScore tns )
-{	// The same as in the base class, but...
-	if( GetLifeSeconds() <= 0 )
+void LifeMeterTime2::ChangeLife( TapNoteScore tns, int nCol )
+{
+	float fLifeSeconds = GetLifeSeconds();
+	if( fLifeSeconds <= 0 )
 		return;
 
 	float fMeterChange = 0;
@@ -168,20 +183,186 @@ void LifeMeterTime2::ChangeLife( TapNoteScore tns )
 	case TNS_CheckpointHit:	fMeterChange = m_customlifechange[SE_CheckpointHit];	break;
 	case TNS_CheckpointMiss:fMeterChange = m_customlifechange[SE_CheckpointMiss];	break;
 	}
-
+	
+	if( tns != TNS_CheckpointHit && tns != TNS_CheckpointMiss ) {
+		if (fMeterChange>0)
+			fMeterChange *= g_fColsPosFactor[(nCol>7 ? 7 : (nCol<0? 0:nCol))];
+		else
+			fMeterChange *= g_fColsNegFactor[(nCol>7 ? 7 : (nCol<0? 0:nCol))];
+	}
+	
+	fMeterChange = ChangeMeterChangeOnAboveMax( fMeterChange, fLifeSeconds );
+	printf("LifeMeterTime2::ChangeLife: fMeterChange = %f\n", fMeterChange);
 	float fOldLife = m_fLifeTotalLostSeconds;
 	m_fLifeTotalLostSeconds -= fMeterChange;
 	SendLifeChangedMessage( fOldLife, tns, HoldNoteScore_Invalid );
 }
 
+void LifeMeterTime2::ChangeLife( HoldNoteScore hns, TapNoteScore tns )
+{
+	float fLifeSeconds = GetLifeSeconds();
+	if( fLifeSeconds <= 0 )
+		return;
+
+	float fMeterChange = 0;
+	switch( hns )
+	{
+	default:
+		FAIL_M(ssprintf("Invalid HoldNoteScore: %i", hns));
+	case HNS_Held:	fMeterChange = g_fTimeMeterSecondsChange[SE_Held];	break;
+	case HNS_LetGo:	fMeterChange = g_fTimeMeterSecondsChange[SE_LetGo];	break;
+	case HNS_Missed:	fMeterChange = g_fTimeMeterSecondsChange[SE_Missed];	break;
+	}
+	
+	fMeterChange = ChangeMeterChangeOnAboveMax( fMeterChange, fLifeSeconds ); // :)
+
+	float fOldLife = m_fLifeTotalLostSeconds;
+	m_fLifeTotalLostSeconds -= fMeterChange;
+	SendLifeChangedMessage( fOldLife, tns, hns );
+}
+
+
+float LifeMeterTime2::GetLife() const
+{
+	float fLifeWithOverload = GetLife_w_overload();
+	return clamp( fLifeWithOverload, 0, 1 );
+}
+
+float LifeMeterTime2::GetLife_w_overload() const
+{
+	float fPercent = GetLifeSeconds() / m_fMaxSeconds;
+	return ( fPercent < 0 ? 0 : fPercent );
+}
 
 // Protected
 float LifeMeterTime2::GetLifeSeconds() const
 {
 	float secs = m_fLifeTotalGainedSeconds - (m_fLifeTotalLostSeconds + STATSMAN->m_CurStageStats.m_fStepsSeconds);
-	//float stoptime = ;
 	secs += clamp(m_fCurrentCummulativeStop, 0, m_fSongTotalStopSeconds);
 	return secs;
 	//return m_fLifeTotalGainedSeconds - (m_fLifeTotalLostSeconds + STATSMAN->m_CurStageStats.m_fStepsSeconds);
 }
+
+float LifeMeterTime2::ChangeMeterChangeOnAboveMax( float fMeterChange, float fLifeSeconds )
+{
+	// Any meter change above MaxSeconds is divided by 2. Example:
+	// [===========|_] 2.8s/3.0s; fMeterChange = 0.25
+	//                 3.05s	is 0.05 above MaxSeconds. Divide the difference by 2.
+	// [=============] 3.025s/3.0s; final fMeterChange = 0.225
+	if ( fMeterChange > 0 ) {
+		float fRemainingForMaxSeconds = m_fMaxSeconds - fLifeSeconds;
+		if ( fRemainingForMaxSeconds < 0 ) { // if LifeSeconds is already above MaxSeconds.
+			// Divide all the fMeterChange by 2.
+			fMeterChange /= 2;
+		}
+		else if (fRemainingForMaxSeconds < fMeterChange) {
+			// If LifeSeconds is too low to get above MaxSeconds, do nothing.
+			// Otherwhise, get calc the difference and divide it by 2.
+			float fDiffAboveMax = fMeterChange - fRemainingForMaxSeconds;
+			fMeterChange -= fDiffAboveMax/2;
+			// Just in case that fMeterChange result negative by bad precision, set it to 0.
+			fMeterChange = fMeterChange < 0 ? 0 : fMeterChange;
+		}
+	}
+	return fMeterChange;
+}
+
+
+
+void LifeMeterTime2::AgregarStop( float timebeat, float length, float divfactor )
+{
+	NoTimeZone ntz = {length,divfactor};
+	if ( m_notimezones.count(timebeat) > 0 && m_notimezones[timebeat].divfactor==divfactor ) {
+		ntz.length += m_notimezones[timebeat].length;
+	}
+	m_notimezones[timebeat] = ntz;
+}
+
+int lua_AgregarStop( lua_State *L )
+{
+	LifeMeterTime2 *lmt2 = (LifeMeterTime2*)lua_touserdata(L, lua_upvalueindex(1));
+	float timebeat = luaL_checknumber(L,1), amount=luaL_checknumber(L,2);
+	float divfactor = luaL_optnumber(L,3, 1.0f);
+	lmt2->AgregarStop( timebeat, amount, divfactor );
+	return 0;
+}
+
+void LifeMeterTime2::fillNoTimes()
+{
+	TimingData* timingdata = GAMESTATE->m_pCurSteps[m_pPlayerState->m_PlayerNumber]->GetTimingData();
+	m_notimezones.clear();
+	bool done = false;
+	{
+		Lua *L = LUA->Get();
+		FILL_NO_TIMES_FUNC.PushSelf(L);	// La función a llamar
+		lua_pushlightuserdata(L, (void*)this);
+		lua_pushcclosure(L, (lua_CFunction)lua_AgregarStop, 1);	// param 1: Funcion para agregar
+		timingdata->PushSelf(L);	// param 2: TimingData
+		LuaHelpers::Push(L, m_pPlayerState->m_PlayerNumber);	// param 3: PlayerNumber
+		RString error= "Error running FillNoTimesFunc callback: ";
+		done = LuaHelpers::RunScriptOnStack(L, error, 3, 0, true); // Llamar la función
+			// La función devuelve una tabla
+		if (!done) {
+			m_notimezones.clear();
+		}
+		// 
+		LUA->Release(L);
+	}
+
+	if (!done) {
+		const vector<TimingSegment*> segs1 = timingdata->GetTimingSegments( SEGMENT_STOP );
+		std::vector<TimingSegment*>::const_iterator it;
+		for (it = segs1.begin() ; it != segs1.end(); ++it) {
+			StopSegment* ts = (StopSegment*)(*it);
+			float beat=ts->GetBeat(), length=ts->GetPause();
+			float timebeat = timingdata->GetElapsedTimeFromBeat(beat);
+			AgregarStop(timebeat,length);
+		}
+
+		const vector<TimingSegment*> segs2 = timingdata->GetTimingSegments( SEGMENT_DELAY );
+		std::vector<TimingSegment*>::const_iterator it2;
+		for (it2 = segs2.begin() ; it2 != segs2.end(); ++it2) {
+			DelaySegment* ts = (DelaySegment*)(*it2);
+			float beat=ts->GetBeat(), length=ts->GetPause();
+			float timebeat = timingdata->GetElapsedTimeFromBeat(beat);
+			AgregarStop(timebeat,length);
+		}
+	}
+}
+
+float LifeMeterTime2::getCummulativeStopSecs( float time ) const
+{
+	float total = 0;
+	for (map<float,NoTimeZone>::const_iterator it = m_notimezones.begin(); it!=m_notimezones.end(); ++it) {
+		float timebeat = it->first;
+		NoTimeZone ntz = it->second;
+		if (timebeat < time) {
+			float difference = time-timebeat;
+			total += min( difference, ntz.length ) / ntz.divfactor;
+		}
+	}
+	return total;
+}
+
+
+// lua start
+#include "LuaBinding.h"
+
+/** @brief Allow Lua to have access to the LifeMeterTime2. */
+class LunaLifeMeterTime2: public Luna<LifeMeterTime2>
+{
+public:
+	static int GetLifeWithOverload( T* p, lua_State *L )
+	{
+		LuaHelpers::Push( L, p->GetLife_w_overload() );
+		return 1;
+	}
+
+	LunaLifeMeterTime2()
+	{
+		ADD_METHOD( GetLifeWithOverload );
+	}
+};
+
+LUA_REGISTER_DERIVED_CLASS( LifeMeterTime2, LifeMeter )
 

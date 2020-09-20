@@ -106,7 +106,7 @@ void LifeMeterBar::Load( const PlayerState *pPlayerState, PlayerStageStats *pPla
 	AfterLifeChanged();
 }
 
-void LifeMeterBar::ChangeLife( TapNoteScore score )
+void LifeMeterBar::ChangeLife( TapNoteScore score, int nCol )
 {
 	float fDeltaLife=0.f;
 	switch( score )

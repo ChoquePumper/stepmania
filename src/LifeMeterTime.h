@@ -23,7 +23,7 @@ public:
 	virtual void Update( float fDeltaTime );
 
 	virtual void OnLoadSong();
-	virtual void ChangeLife( TapNoteScore score );
+	virtual void ChangeLife( TapNoteScore score, int nCol=1 );
 	virtual void ChangeLife( HoldNoteScore score, TapNoteScore tscore );
 	virtual void ChangeLife(float delta);
 	virtual void SetLife(float value);
@@ -34,8 +34,12 @@ public:
 	virtual float GetLife() const;
 
 protected: // I want to make the following methods be accesible for derived class.
-	float GetLifeSeconds() const;
+	virtual float GetLifeSeconds() const;
 	void SendLifeChangedMessage( float fOldLife, TapNoteScore tns, HoldNoteScore hns );
+	
+	float		m_fLifeTotalGainedSeconds;
+	float		m_fLifeTotalLostSeconds;
+	RageSound	m_soundGainLife;
 private:
 
 	AutoActor		m_sprBackground;
@@ -43,10 +47,10 @@ private:
 	StreamDisplay*	m_pStream;
 	AutoActor		m_sprFrame;
 
-	float		m_fLifeTotalGainedSeconds;
-	float		m_fLifeTotalLostSeconds;
+	//float		m_fLifeTotalGainedSeconds;
+	//float		m_fLifeTotalLostSeconds;
 	/** @brief The sound played when time is gained at the start of each Song. */
-	RageSound	m_soundGainLife;
+	//RageSound	m_soundGainLife;
 };
 
 

@@ -18,6 +18,7 @@ enum LifeType
 	LifeType_Bar,
 	LifeType_Battery,
 	LifeType_Time,
+	LifeType_Time2,	// :)
 	NUM_LifeType,
 	LifeType_Invalid
 };

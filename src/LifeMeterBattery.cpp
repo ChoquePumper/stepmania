@@ -149,7 +149,7 @@ void LifeMeterBattery::ChangeLives(int iLifeDiff)
 		AddLives(iLifeDiff);
 }
 
-void LifeMeterBattery::ChangeLife( TapNoteScore score )
+void LifeMeterBattery::ChangeLife( TapNoteScore score, int nCol )
 {
 	if( m_iLivesLeft == 0 )
 		return;
