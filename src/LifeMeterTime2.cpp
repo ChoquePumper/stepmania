@@ -21,6 +21,8 @@ static ThemeMetric<LuaReference> GAIN_PER_TAP_FUNC	("LifeMeterTime2","GainPerTap
 static ThemeMetric<LuaReference> FILL_NO_TIMES_FUNC	("LifeMeterTime2","FillNoTimesFunc");
 static ThemeMetric<float> ALLOW_LOWER_GAIN_PER_TAP	("LifeMeterTime2","AllowLowerGainPerTap");
 						// 0.0f = false,	1.0f = true
+static ThemeMetric<float> METER_DIVIDER_ON_OVERLOAD	("LifeMeterTime2","MeterDividerOnOverload");
+
 // From LifeMeterTime
 static ThemeMetric<float> METER_WIDTH		("LifeMeterTime","MeterWidth");
 static ThemeMetric<float> METER_HEIGHT		("LifeMeterTime","MeterHeight");
@@ -29,8 +31,30 @@ static ThemeMetric<float> INITIAL_VALUE		("LifeMeterTime","InitialValue");
 
 
 // This implementation makes LifeMeterTime to behave (a bit) similiar to osu! HP bar.
+static const float g_fTimeMeter2SecondsChangeInit[] =
+{
+	+0.05f, // SE_CheckpointHit
+	+0.22f, // SE_W1
+	+0.112f, // SE_W2
+	+0.04f, // SE_W3
+	-0.18f, // SE_W4
+	-1.3f, // SE_W5
+	-2.25f, // SE_Miss
+	-2.2f, // SE_HitMine
+	-0.85f, // SE_CheckpointMiss
+	+0.1f, // SE_Held
+	-2.25f, // SE_LetGo
+	-0.0f, // SE_Missed
+};
+COMPILE_ASSERT( ARRAYLEN(g_fTimeMeter2SecondsChangeInit) == NUM_ScoreEvent );
 
-extern Preference1D<float>	g_fTimeMeterSecondsChange;
+static void TimeMeter2SecondsChangeInit( size_t /*ScoreEvent*/ i, RString &sNameOut, float &defaultValueOut )
+{
+	sNameOut = "TimeMeter2SecondsChange" + ScoreEventToString( (ScoreEvent)i );
+	defaultValueOut = g_fTimeMeter2SecondsChangeInit[i];
+}
+
+static Preference1D<float>	g_fTimeMeter2SecondsChange( TimeMeter2SecondsChangeInit, NUM_ScoreEvent );
 
 static const float g_fColsPosFactor[] =
 {
@@ -61,12 +85,12 @@ LifeMeterTime2::LifeMeterTime2()
 	: LifeMeterTime()
 {
 	m_fMaxSeconds = MAX_TIME;
-	for(int i=0; i<12; i++) m_customlifechange[i] = g_fTimeMeterSecondsChange[i];
+	for(int i=0; i<12; i++) m_customlifechange[i] = g_fTimeMeter2SecondsChange[i];
 	//m_fLifeTotalGainedSeconds = 0;	// Private
 	//m_fLifeTotalLostSeconds = 0;	// Private
-	//Custom
 	m_fSongTotalStopSeconds = 0;
 	m_fCurrentCummulativeStop = 0;
+	m_fDividerOnOverload = 2;
 	m_bLockLife = false;
 	
 	//m_pStream = NULL; // Private
@@ -135,18 +159,21 @@ void LifeMeterTime2::OnLoadSong()
 	}
 	m_customlifechange[SE_W1] = fMaxGainPerTap;
 	m_customlifechange[SE_W2] = fMaxGainPerTap*0.5f;
-	m_customlifechange[SE_W3] = fMaxGainPerTap*0.02f;
+	m_customlifechange[SE_W3] = fMaxGainPerTap*0.04f;
+	printf("LifeMeterTime2::OnLoadSong: fMaxGainPerTap:\n %f\n %f\n %f\n",
+		m_customlifechange[SE_W1], m_customlifechange[SE_W2], m_customlifechange[SE_W3]);
 	
 	for(int i=0; i<12; i++) {
 		float fGainPerTap = m_customlifechange[i];
 		if (fGainPerTap > 0) {
-			float fDeltaCustom = g_fTimeMeterSecondsChange[i] - fGainPerTap;
+			float fDeltaCustom = g_fTimeMeter2SecondsChange[i] - fGainPerTap;
 			if (fDeltaCustom > 0) {
-				m_customlifechange[i] = g_fTimeMeterSecondsChange[i] - fDeltaCustom*ALLOW_LOWER_GAIN_PER_TAP;
+				m_customlifechange[i] = g_fTimeMeter2SecondsChange[i] - fDeltaCustom*ALLOW_LOWER_GAIN_PER_TAP;
 			}
 		}
 	}
 	
+	m_fDividerOnOverload = METER_DIVIDER_ON_OVERLOAD;
 
 	if( MIN_LIFE_TIME > fGainSeconds )
 		fGainSeconds = MIN_LIFE_TIME;
@@ -209,9 +236,9 @@ void LifeMeterTime2::ChangeLife( HoldNoteScore hns, TapNoteScore tns )
 	{
 	default:
 		FAIL_M(ssprintf("Invalid HoldNoteScore: %i", hns));
-	case HNS_Held:	fMeterChange = g_fTimeMeterSecondsChange[SE_Held];	break;
-	case HNS_LetGo:	fMeterChange = g_fTimeMeterSecondsChange[SE_LetGo];	break;
-	case HNS_Missed:	fMeterChange = g_fTimeMeterSecondsChange[SE_Missed];	break;
+	case HNS_Held:	fMeterChange = g_fTimeMeter2SecondsChange[SE_Held];	break;
+	case HNS_LetGo:	fMeterChange = g_fTimeMeter2SecondsChange[SE_LetGo];	break;
+	case HNS_Missed:	fMeterChange = g_fTimeMeter2SecondsChange[SE_Missed];	break;
 	}
 	
 	fMeterChange = ChangeMeterChangeOnAboveMax( fMeterChange, fLifeSeconds ); // :)
@@ -253,13 +280,14 @@ float LifeMeterTime2::ChangeMeterChangeOnAboveMax( float fMeterChange, float fLi
 		float fRemainingForMaxSeconds = m_fMaxSeconds - fLifeSeconds;
 		if ( fRemainingForMaxSeconds < 0 ) { // if LifeSeconds is already above MaxSeconds.
 			// Divide all the fMeterChange by 2.
-			fMeterChange /= 2;
+			fMeterChange /= m_fDividerOnOverload;
 		}
 		else if (fRemainingForMaxSeconds < fMeterChange) {
 			// If LifeSeconds is too low to get above MaxSeconds, do nothing.
-			// Otherwhise, get calc the difference and divide it by 2.
+			// Otherwhise, calculate the difference and divide it by 2.
 			float fDiffAboveMax = fMeterChange - fRemainingForMaxSeconds;
-			fMeterChange -= fDiffAboveMax/2;
+			//fMeterChange -= fDiffAboveMax / m_fDividerOnOverload; // bad
+			fMeterChange = fMeterChange - fDiffAboveMax + fDiffAboveMax / m_fDividerOnOverload;
 			// Just in case that fMeterChange result negative by bad precision, set it to 0.
 			fMeterChange = fMeterChange < 0 ? 0 : fMeterChange;
 		}

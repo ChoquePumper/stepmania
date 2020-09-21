@@ -47,11 +47,12 @@ private:
 	float m_fMaxSeconds;
 	
 	float		m_customlifechange[12];
+	float		m_fDividerOnOverload;
 	void		SetCustomLifeChange();
 	float		m_fSongTotalStopSeconds;
 	map<float,NoTimeZone>	m_notimezones;
-	float m_firstSecondCummulativeStop;
-	float m_fCurrentCummulativeStop;
+	float		m_firstSecondCummulativeStop;
+	float		m_fCurrentCummulativeStop;
 	bool m_bLockLife;
 	void fillNoTimes();
 	void AgregarStop( float timebeat, float length, float divfactor=1.0f );

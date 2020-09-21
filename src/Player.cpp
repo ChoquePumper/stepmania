@@ -1665,7 +1665,7 @@ void Player::ChangeLife( TapNoteScore tns, int nCol )
 {
 	PlayerNumber pn = m_pPlayerState->m_PlayerNumber;
 	if( m_pLifeMeter )
-		m_pLifeMeter->ChangeLife( tns );
+		m_pLifeMeter->ChangeLife( tns, nCol );
 	if( m_pCombinedLifeMeter )
 		m_pCombinedLifeMeter->ChangeLife( pn, tns );
 
