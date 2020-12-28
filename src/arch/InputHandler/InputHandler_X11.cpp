@@ -204,7 +204,8 @@ void InputHandler_X11::Update()
 				continue;
 			}
 			// This is a new event so the last release was not a repeat.
-			ButtonPressed( DeviceInput(DEVICE_KEYBOARD, lastDB, 0) );
+			/* ButtonPressed( DeviceInput(DEVICE_KEYBOARD, lastDB, 0) ); */
+			RegisterKeyEvent( event.xkey.time, false, lastDB );
 			lastEvent.type = 0;
 		}
 
@@ -221,7 +222,8 @@ void InputHandler_X11::Update()
 			continue;
 
 		if( bKeyPress )
-			ButtonPressed( DeviceInput(DEVICE_KEYBOARD, lastDB, 1) );
+			// ButtonPressed( DeviceInput(DEVICE_KEYBOARD, lastDB, 1) );
+			RegisterKeyEvent( event.xkey.time, true, lastDB );
 		/*
 		else if( bMousePress )
 			ButtonPressed( DeviceInput(DEVICE_MOUSE, lastDB, 1) );
@@ -234,7 +236,8 @@ void InputHandler_X11::Update()
 	if( lastEvent.type != 0 )
 	{
 		if( lastEvent.type == (KeyPress|KeyRelease) )
-			ButtonPressed( DeviceInput(DEVICE_KEYBOARD, lastDB, 0) );
+			// ButtonPressed( DeviceInput(DEVICE_KEYBOARD, lastDB, 0) );
+			RegisterKeyEvent( event.xkey.time, false, lastDB );
 		/*
 		if( lastEvent.type == (ButtonPress|ButtonRelease) )
 			ButtonPressed( DeviceInput(DEVICE_MOUSE, lastDB, 0) );
@@ -253,6 +256,28 @@ void InputHandler_X11::GetDevicesAndDescriptions( vector<InputDeviceInfo>& vDevi
 		vDevicesOut.push_back( InputDeviceInfo(DEVICE_MOUSE,"Mouse") );
 	}
 }
+
+// From pull request 1702 from upstream
+void InputHandler_X11::RegisterKeyEvent( unsigned long timestamp, bool keyDown, DeviceButton button )
+{
+	// https://linux.die.net/man/3/xkeyevent
+	// Event timestamp is in milliseconds
+
+	// seconds, microseconds
+	RageTimer timer(
+	  timestamp / 1000,
+	  (timestamp % 1000) * 1000 );
+
+	DeviceInput di(
+		DEVICE_KEYBOARD,
+		button,
+		keyDown ? 1.0f:0.0f,
+		timer);
+
+	ButtonPressed( di );
+}
+
+
 
 /*
  * (c) 2005, 2006 Sean Burke, Ben Anderson, Steve Checkoway
