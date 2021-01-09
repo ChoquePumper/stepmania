@@ -124,7 +124,7 @@ void LifeMeterTime2::OnLoadSong()
 		fGainSeconds= pCourse->m_vEntries[GAMESTATE->GetCourseSongIndex()].fGainSeconds;
 	}
 
-	float fMaxGainPerTap;
+	float fMaxGainPerTap=-1; bool bNotATable = true;
 	Song* song= GAMESTATE->m_pCurSong;
 	m_fLifeTotalLostSeconds -= m_fSongTotalStopSeconds;
 	fillNoTimes();
@@ -140,27 +140,43 @@ void LifeMeterTime2::OnLoadSong()
 		LuaHelpers::Push(L, m_pPlayerState->m_PlayerNumber);
 		RString error= "Error running GainPerTapFunc callback: ";
 		LuaHelpers::RunScriptOnStack(L, error, 2, 1, true);
-		fMaxGainPerTap = luaL_optnumber(L, -1, -1);
+		if (lua_type(L,-1)==LUA_TNUMBER)
+			fMaxGainPerTap = luaL_optnumber(L, -1, -1);
+		else if (lua_type(L,-1)==LUA_TTABLE) {
+			// Override multiple values from a table
+			bNotATable = false;
+			lua_pushnil(L);	// Stack:[ table, nil
+			while (lua_next(L, -2) != 0) {
+				// Stack:[ table, key, value
+				int i = (int)luaL_optnumber(L, -2, -1);
+				if (i>=0) { // if key is a number (greater or equal to 0)
+					m_customlifechange[i] = (float)luaL_optnumber(L, -1, 0);;
+				}
+				lua_pop(L,1); // Stack:[ table, key
+			}
+		}
 		lua_settop(L, 0);
 		LUA->Release(L);
 	}
-	if (fMaxGainPerTap <= -1) {
-		ASSERT(song != NULL);
-		float song_len= song->GetLastSecond() - song->GetFirstSecond() - m_firstSecondCummulativeStop;
-		Steps* steps= GAMESTATE->m_pCurSteps[m_pPlayerState->m_PlayerNumber];
-		ASSERT(steps != NULL);
-		RadarValues radars= steps->GetRadarValues(m_pPlayerState->m_PlayerNumber);
-		float scorable_things= radars[RadarCategory_TapsAndHolds] + radars[RadarCategory_Lifts];
-	
-		fMaxGainPerTap = song_len/scorable_things;
-		// fGainPerTap = fGainPerTap*(1.232f+(float)scorable_things/8000.0f)+(0.008f*min(song_len,240)/60);
-		fMaxGainPerTap = fMaxGainPerTap*(CONSTANT_BONUS+(float)scorable_things/8000.0f)+(0.007f*min(song_len,240)/60);
+	if (bNotATable) {
+		if (fMaxGainPerTap <= -1) {
+			ASSERT(song != NULL);
+			float song_len= song->GetLastSecond() - song->GetFirstSecond() - m_firstSecondCummulativeStop;
+			Steps* steps= GAMESTATE->m_pCurSteps[m_pPlayerState->m_PlayerNumber];
+			ASSERT(steps != NULL);
+			RadarValues radars= steps->GetRadarValues(m_pPlayerState->m_PlayerNumber);
+			float scorable_things= radars[RadarCategory_TapsAndHolds] + radars[RadarCategory_Lifts];
 		
+			fMaxGainPerTap = song_len/scorable_things;
+			// fGainPerTap = fGainPerTap*(1.232f+(float)scorable_things/8000.0f)+(0.008f*min(song_len,240)/60);
+			fMaxGainPerTap = fMaxGainPerTap*(CONSTANT_BONUS+(float)scorable_things/8000.0f)+(0.001f*min(song_len,240)/60);
+			
+		}
+		m_customlifechange[SE_W1] = fMaxGainPerTap;
+		m_customlifechange[SE_W2] = fMaxGainPerTap*0.5f;
+		m_customlifechange[SE_W3] = fMaxGainPerTap*0.04f;
 	}
-	m_customlifechange[SE_W1] = fMaxGainPerTap;
-	m_customlifechange[SE_W2] = fMaxGainPerTap*0.5f;
-	m_customlifechange[SE_W3] = fMaxGainPerTap*0.04f;
-	printf("LifeMeterTime2::OnLoadSong: fMaxGainPerTap:\n %f\n %f\n %f\n",
+	printf("LifeMeterTime2::OnLoadSong: fGainPerTap:\n %f\n %f\n %f\n",
 		m_customlifechange[SE_W1], m_customlifechange[SE_W2], m_customlifechange[SE_W3]);
 	
 	for(int i=0; i<12; i++) {
@@ -219,7 +235,7 @@ void LifeMeterTime2::ChangeLife( TapNoteScore tns, int nCol )
 	}
 	
 	fMeterChange = ChangeMeterChangeOnAboveMax( fMeterChange, fLifeSeconds );
-	printf("LifeMeterTime2::ChangeLife: fMeterChange = %f\n", fMeterChange);
+	//printf("LifeMeterTime2::ChangeLife: fMeterChange = %f\n", fMeterChange);
 	float fOldLife = m_fLifeTotalLostSeconds;
 	m_fLifeTotalLostSeconds -= fMeterChange;
 	SendLifeChangedMessage( fOldLife, tns, HoldNoteScore_Invalid );
